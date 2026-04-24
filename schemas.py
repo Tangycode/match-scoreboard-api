@@ -1,22 +1,37 @@
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import List, Optional, Dict
 
+# -----------------------------
+# MATCH
+# -----------------------------
 class Match(BaseModel):
     match_id: str
     format: Optional[str] = "T20"
 
+# -----------------------------
+# INNINGS
+# -----------------------------
 class Innings(BaseModel):
     innings_id: str
     team: str
     overs: float
 
+# -----------------------------
+# TEAM
+# -----------------------------
 class Team(BaseModel):
     name: str
 
+# -----------------------------
+# PLAYER
+# -----------------------------
 class Player(BaseModel):
     player_id: str
     team: str
 
+# -----------------------------
+# BALL EVENT
+# -----------------------------
 class BallEvent(BaseModel):
     innings_id: str
     over: int
@@ -26,9 +41,12 @@ class BallEvent(BaseModel):
     runs: int
     wicket: bool = False
 
+# -----------------------------
+# MAIN PAYLOAD
+# -----------------------------
 class MatchSchema(BaseModel):
     match: Match
     innings: List[Innings]
-    teams: dict
+    teams: Dict[str, Team]
     players: List[Player]
     ball_events: List[BallEvent]
