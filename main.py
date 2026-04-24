@@ -1,22 +1,44 @@
 from fastapi import FastAPI, HTTPException
-from scoreboard_services import generate_match_scoreboard
+from fastapi.middleware.cors import CORSMiddleware
+from schemas import MatchSchema
+from services import ScoreboardService
 
 app = FastAPI()
 
+# CORS (MANDATORY)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# ROOT
 @app.get("/")
-def home():
-    return {"message": "Match Scoreboard API is running"}
+def root():
+    return {
+        "service": "Khel AI Scoreboard API",
+        "status": "running"
+    }
 
-@app.post("/match/scoreboard")
-def match_scoreboard(payload: dict):
-    match_id = payload.get("match_id")
-    innings_data = payload.get("innings_data")
+# HEALTH CHECK
+@app.get("/health")
+def health():
+    return {"status": "ok"}
 
-    if not match_id:
-        raise HTTPException(status_code=400, detail="match_id is required")
+# MAIN ENDPOINT
+@app.post("/scoreboard")
+def scoreboard(payload: MatchSchema):
 
-    if innings_data is not None and not isinstance(innings_data, list):
-        raise HTTPException(status_code=400, detail="innings_data must be a list")
+    # VALIDATION RULES (STRICT 400 ERRORS)
+    if not payload.match or not payload.match.match_id:
+        raise HTTPException(status_code=400, detail="missing match_id")
 
-    scoreboard = generate_match_scoreboard(match_id, innings_data)
-    return scoreboard
+    if not payload.ball_events:
+        raise HTTPException(status_code=400, detail="ball_events cannot be empty")
+
+    if not payload.innings:
+        raise HTTPException(status_code=400, detail="empty innings")
+
+    return ScoreboardService.compute(payload)
