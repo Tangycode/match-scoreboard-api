@@ -3,94 +3,97 @@ class ScoreboardService:
     @staticmethod
     def compute(payload):
 
-        # -----------------------------
-        # STATE INITIALIZATION
-        # -----------------------------
-        state = {
-            "innings_to_team": {},
-            "team_score": {},
-            "team_wickets": {},
-            "team_overs": {}
-        }
+        results = []
 
-        # -----------------------------
-        # BUILD INNINGS MAPPING
-        # -----------------------------
         for inn in payload.innings:
-            state["innings_to_team"][inn.innings_id] = inn.team
 
-            state["team_score"][inn.team] = 0
-            state["team_wickets"][inn.team] = 0
-            state["team_overs"][inn.team] = 0.0
+            score = 0
+            wickets = 0
+            legal_balls = 0
 
-        # -----------------------------
-        # PROCESS BALL EVENTS
-        # -----------------------------
-        for event in payload.ball_events:
+            batter_runs = {}
+            bowler_runs = {}
 
-            team = state["innings_to_team"].get(event.innings_id)
+            recent_balls = []
 
-            if team is None:
-                team = "UNKNOWN"
+            for e in inn.ball_events:
 
-            # INIT SAFETY (EDGE CASES)
-            if team not in state["team_score"]:
-                state["team_score"][team] = 0
-                state["team_wickets"][team] = 0
-                state["team_overs"][team] = 0.0
+                # -------------------------
+                # RUN CALCULATION
+                # -------------------------
+                total_runs = (
+                    e.runs_off_bat +
+                    e.wides +
+                    e.no_balls +
+                    e.byes +
+                    e.leg_byes
+                )
 
-            # -------------------------
-            # SCORE UPDATE
-            # -------------------------
-            state["team_score"][team] += event.runs
+                score += total_runs
 
-            # -------------------------
-            # WICKET UPDATE
-            # -------------------------
-            if event.wicket:
-                state["team_wickets"][team] += 1
+                # -------------------------
+                # LEGAL BALL LOGIC
+                # -------------------------
+                if e.wides == 0 and e.no_balls == 0:
+                    legal_balls += 1
 
-            # -------------------------
-            # OVER CALCULATION
-            # -------------------------
-            state["team_overs"][team] = round(
-                event.over + (event.ball / 6),
-                1
-            )
+                # -------------------------
+                # WICKET
+                # -------------------------
+                if e.wicket:
+                    wickets += 1
 
-        # -----------------------------
-        # BUILD INNINGS OUTPUT
-        # -----------------------------
-        innings_output = []
+                # -------------------------
+                # BATTER STATS
+                # -------------------------
+                if e.batsman:
+                    batter_runs[e.batsman] = batter_runs.get(e.batsman, 0) + e.runs_off_bat
 
-        for team in state["team_score"]:
-            innings_output.append({
-                "team": team,
-                "score": state["team_score"][team],
-                "wickets": state["team_wickets"][team],
-                "overs": state["team_overs"][team]
+                # -------------------------
+                # BOWLER STATS
+                # -------------------------
+                if e.bowler:
+                    conceded = e.runs_off_bat + e.wides + e.no_balls
+                    bowler_runs[e.bowler] = bowler_runs.get(e.bowler, 0) + conceded
+
+                # -------------------------
+                # RECENT BALLS
+                # -------------------------
+                recent_balls.append({
+                    "over": e.over,
+                    "ball": e.ball,
+                    "runs": total_runs,
+                    "wicket": e.wicket
+                })
+
+            overs = round(legal_balls / 6, 1)
+            run_rate = round(score / overs, 2) if overs > 0 else 0
+
+            top_batter = max(batter_runs, key=batter_runs.get) if batter_runs else None
+            top_bowler = min(bowler_runs, key=bowler_runs.get) if bowler_runs else None
+
+            results.append({
+                "match": payload.match_id,
+                "venue": payload.venue,
+                "innings_number": inn.innings_number,
+                "batting_team": inn.batting_team,
+                "bowling_team": inn.bowling_team,
+                "score": score,
+                "wickets": wickets,
+                "overs": overs,
+                "run_rate": run_rate,
+                "top_batter": top_batter,
+                "top_bowler": top_bowler,
+                "recent_balls": recent_balls[-6:]
             })
 
-        # -----------------------------
-        # FINAL RESPONSE (FRONTEND SAFE)
-        # -----------------------------
-        return {
-            "match_id": payload.match.match_id,
-            "innings": innings_output,
-            "live_state": {
-                "total_innings": len(payload.innings),
-                "teams_count": len(state["team_score"])
-            }
-        }
+        return {"match_id": payload.match_id, "innings": results}
 
-    # -----------------------------
-    # PLAYER TEAM RESOLUTION (FALLBACK)
-    # -----------------------------
     @staticmethod
-    def resolve_team(event, payload):
-
-        for player in payload.players:
-            if player.player_id == event.batsman:
-                return player.team
-
-        return "UNKNOWN"
+    def no_data(match_id):
+        return {
+            "match_id": match_id,
+            "status": "no_data",
+            "message": "No innings data available",
+            "innings": []
+        }
