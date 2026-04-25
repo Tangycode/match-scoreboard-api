@@ -1,0 +1,15 @@
+{
+  "match_id": "M001",
+  "venue": "Stadium A",
+  "innings": [
+    {
+      "innings_number": 1,
+      "batting_team": "A",
+      "bowling_team": "B",
+      "ball_events": [
+        { "over": 1, "ball": 1, "runs_off_bat": 4, "wides": 0, "no_balls": 0, "byes": 0, "leg_byes": 0, "wicket": false },
+        { "over": 1, "ball": 2, "runs_off_bat": 1, "wides": 0, "no_balls": 0, "byes": 0, "leg_byes": 0, "wicket": false }
+      ]
+    }
+  ]
+}
